@@ -1,77 +1,57 @@
-# Chat With Your Files (RAG Pipeline)
+# Atlas RAG Studio
 
-Upload Markdown → ask questions → get grounded answers sourced only from your content.
+An agentic retrieval-augmented generation project designed as a portfolio-ready, production-minded demo for 2026. It includes a modern FastAPI backend, Pinecone vector search, Anthropic LLM orchestration, and a clean React interface for interactive exploration.
 
-## Snapshot (Why It Matters)
-Demonstrates end‑to‑end Retrieval Augmented Generation with:
-- Automatic ingestion & processing (triggers + Edge Functions)
-- Vector similarity search (pgvector, HNSW)
-- Hybrid embeddings (server for documents, client for queries)
-- Streaming LLM responses with constrained context
-- Strong data isolation via Row Level Security
+## Features
+- Agentic query flow with retrieval planning, answer synthesis, and trace output
+- Pinecone-backed semantic search with metadata-rich citations
+- Local ingestion pipeline for markdown, text, and JSON inputs
+- Streaming-ready API design and modular services
+- Frontend with sources, confidence signals, and run traces
 
-## Architecture Flow
-```
-Upload → Storage trigger → process fn (parse + chunk) → sections → embed fn (batch embeddings)
-→ Postgres (pgvector index)
-→ Query: local embedding (Web Worker) → match_document_sections → OpenAI (stream) → UI
-```
+## Quickstart
+### Backend
+1. Create a virtual environment and install dependencies
+   - `python -m venv .venv`
+   - `.venv\Scripts\activate`
+   - `pip install -r backend\requirements.txt`
+2. Copy env config and fill in keys
+   - `copy backend\.env.example backend\.env`
+3. Run the API
+   - `uvicorn app.main:app --reload --app-dir backend`
 
-## Tech Stack
-Next.js (App Router) · Supabase (Auth, Storage, Postgres, Edge Functions) · pgvector (HNSW) · OpenAI API · Transformers.js (in-browser) · TypeScript · Tailwind
+### Frontend
+1. Install dependencies
+   - `cd frontend`
+   - `npm install`
+2. Configure API base URL
+   - `copy .env.example .env`
+3. Run the app
+   - `npm run dev`
 
-## Core Data & Retrieval
-| Object | Purpose |
-|--------|---------|
-| `documents` | One row per uploaded file |
-| `document_sections` | Chunked text + embedding (vector 384) |
-| RPC `match_document_sections` | Inner product similarity lookup |
+## Ingestion
+Use the API to ingest local files or raw text payloads.
+- POST `/ingest`
+- POST `/query`
 
-Retrieval: normalized embeddings + thresholded inner product for fast filtering.
+Sample documents are provided under `data/sample`.
 
-## Key Decisions
-| Choice | Benefit |
-|--------|---------|
-| DB triggers over external queue | Fewer moving parts early on |
-| Client-side query embedding | Lower latency & cost control |
-| Heading-based chunking | Keeps semantic cohesion |
-| Streaming responses | Better UX under longer generations |
+Seed the index with the demo content:
+- `python backend\scripts\seed_demo.py`
 
-## Security
-- RLS + storage policies enforce per-user isolation
-- Edge Functions require bearer token
-- Only selected chunk text goes to OpenAI
+## Environment Variables
+Backend:
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_MODEL`
+- `PINECONE_API_KEY`
+- `PINECONE_INDEX`
+- `PINECONE_CLOUD`
+- `PINECONE_REGION`
+- `EMBEDDING_MODEL`
+- `EMBEDDING_DIM`
 
-## Selected Source Files
-| File | Role |
-|------|------|
-| `supabase/migrations/*.sql` | Schema, triggers, RLS, vector index |
-| `supabase/functions/process/index.ts` | Parse + chunk markdown |
-| `supabase/functions/embed/index.ts` | Batch embedding writes |
-| `supabase/functions/chat/index.ts` | Retrieval + streaming answer |
-| `supabase/functions/_lib/markdown-parser.ts` | Heading-based chunk logic |
-| `lib/hooks/use-pipeline.ts` | Web Worker embedding hook |
-| `app/chat/page.tsx` | Chat UI + streaming integration |
+Frontend:
+- `VITE_API_BASE_URL`
 
-## Local Setup
-```
-npm install
-supabase start
-npm run dev
-```
-Env:
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-OPENAI_API_KEY=...
-```
-Regenerate DB types: `npm run gen:types`
-
-## Possible Extensions
-Citizens / citations, metadata filtering, observability, rate limiting, tests for chunker & retrieval.
-
-## Focus Demonstrated
-Applied RAG design, secure multi-tenant data handling, vector retrieval wiring, and pragmatic trade-offs for latency & cost.
-
-
----
+## Notes
+This project is intended to be a clean, original implementation you can evolve into a fuller product demo.
