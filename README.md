@@ -2,7 +2,7 @@
 
 An agentic retrieval-augmented generation project designed as a portfolio-ready, production-minded demo for 2026. It includes a modern FastAPI backend, Pinecone vector search, Anthropic LLM orchestration, and a clean React interface for interactive exploration.
 
-<img width="1235" height="1462" alt="image" src="https://github.com/user-attachments/assets/5e8c6a21-5cfe-4247-80d0-09149d6198c4" />
+<img width="1984" height="1551" alt="diagram-export-5-27-2026-9_34_38-AM" src="https://github.com/user-attachments/assets/ee5f2014-21fe-46f7-94ab-2f2631647315" />
 
 
 ## Features
