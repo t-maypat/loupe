@@ -6,9 +6,10 @@ class Settings(BaseSettings):
 
     api_title: str = "Research RAG Studio"
     api_version: str = "0.1.0"
+    app_env: str = "development"
 
     llm_provider: str = "gemini"
-    llm_model: str = "gemini-1.5-pro"
+    llm_model: str = "gemini-2.5-flash-lite"
     gemini_api_key: str
 
     pinecone_api_key: str
@@ -20,6 +21,18 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-001"
     embedding_dim: int = 768
     embedding_batch_size: int = 32
+
+    public_ingest_enabled: bool = True
+    require_hcaptcha: bool = False
+    hcaptcha_secret_key: str | None = None
+    hcaptcha_site_key: str | None = None
+    query_max_chars: int = 600
+    query_top_k_max: int = 8
+    rate_limit_window_seconds: int = 3600
+    rate_limit_requests_per_window: int = 10
+    daily_request_limit: int = 75
+    cache_ttl_seconds: int = 21600
+    session_signing_secret: str = "change-me-before-production"
 
     max_chunk_chars: int = 1200
     chunk_overlap: int = 200

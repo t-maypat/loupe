@@ -31,6 +31,7 @@ class IngestResponse(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     top_k: int = 5
+    hcaptcha_token: str | None = None
 
 
 class SourceChunk(BaseModel):

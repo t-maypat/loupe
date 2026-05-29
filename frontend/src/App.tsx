@@ -1,6 +1,25 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { queryAgent } from "./lib/api";
 import type { Message, SourceChunk, TraceStep } from "./lib/types";
+
+declare global {
+  interface Window {
+    hcaptcha?: {
+      render: (
+        container: string | HTMLElement,
+        options: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+          size?: "normal" | "compact" | "invisible";
+        }
+      ) => string;
+      reset: (widgetId?: string) => void;
+    };
+  }
+}
 
 const starterQuestions = [
   "Explain Retrieval-Augmented Generation and why it improves factuality.",
@@ -32,31 +51,95 @@ const formatMeta = (source: SourceChunk) => {
 };
 
 export default function App() {
+  const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
+  const hcaptchaRef = useRef<HTMLDivElement | null>(null);
+  const [hcaptchaToken, setHcaptchaToken] = useState<string | null>(null);
+  const [hcaptchaReady, setHcaptchaReady] = useState<boolean>(!hcaptchaSiteKey);
+  const [widgetId, setWidgetId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [sources, setSources] = useState<SourceChunk[]>([]);
   const [trace, setTrace] = useState<TraceStep[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hcaptchaSiteKey) return;
+    if (window.hcaptcha) {
+      setHcaptchaReady(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://js.hcaptcha.com/1/api.js?render=explicit";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setHcaptchaReady(true);
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, [hcaptchaSiteKey]);
+
+  useEffect(() => {
+    if (!hcaptchaSiteKey || !hcaptchaReady || !hcaptchaRef.current || !window.hcaptcha || widgetId) {
+      return;
+    }
+
+    const id = window.hcaptcha.render(hcaptchaRef.current, {
+      sitekey: hcaptchaSiteKey,
+      theme: "light",
+      callback: (token: string) => {
+        setHcaptchaToken(token);
+        setErrorMessage(null);
+      },
+      "expired-callback": () => {
+        setHcaptchaToken(null);
+      },
+      "error-callback": () => {
+        setHcaptchaToken(null);
+        setErrorMessage("Verification failed. Please refresh the demo challenge and try again.");
+      },
+      size: "normal"
+    });
+    setWidgetId(id);
+  }, [hcaptchaReady, hcaptchaSiteKey, widgetId]);
+
+  const resetHcaptcha = () => {
+    if (!window.hcaptcha || !widgetId) return;
+    window.hcaptcha.reset(widgetId);
+    setHcaptchaToken(null);
+  };
 
   const handleSend = async (value?: string) => {
     const text = (value ?? question).trim();
     if (!text || loading) return;
+    if (hcaptchaSiteKey && !hcaptchaToken) {
+      setErrorMessage("Please complete the verification challenge before sending a public demo query.");
+      return;
+    }
 
     setLoading(true);
+    setErrorMessage(null);
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setQuestion("");
 
     try {
-      const response = await queryAgent(text, 5);
+      const response = await queryAgent(text, 5, hcaptchaToken ?? undefined);
       setMessages((prev) => [...prev, { role: "assistant", content: response.answer }]);
       setSources(response.sources);
       setTrace(response.trace);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, something went wrong." }
+        {
+          role: "assistant",
+          content: error instanceof Error ? error.message : "Sorry, something went wrong."
+        }
       ]);
     } finally {
+      resetHcaptcha();
       setLoading(false);
     }
   };
@@ -138,6 +221,16 @@ export default function App() {
               {loading ? "Thinking..." : "Send"}
             </button>
           </div>
+          {hcaptchaSiteKey && (
+            <div className="demo-guardrail">
+              <div className="guardrail-copy">
+                <strong>Public demo protection</strong>
+                <p>Complete the challenge to help protect the free-tier backend from automated abuse.</p>
+              </div>
+              <div ref={hcaptchaRef} className="turnstile-slot" />
+            </div>
+          )}
+          {errorMessage && <p className="guardrail-error">{errorMessage}</p>}
         </section>
 
         <aside className="side">

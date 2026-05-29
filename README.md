@@ -23,12 +23,12 @@ Research RAG Studio is an AI research assistant that delivers grounded answers o
 ## Quickstart
 ### Backend
 1. Create a virtual environment and install dependencies
-   - `python -m venv .venv`
-   - `.venv\Scripts\activate`
-   - `pip install -r backend\requirements.txt`
-2. Create backend/.env with required keys (see Environment Variables).
+   - `cd backend`
+   - `uv venv`
+   - `uv pip install -r requirements.txt`
+2. Create `backend/.env` from `backend/.env.example` and fill in required keys.
 3. Run the API
-   - `uvicorn app.main:app --reload --app-dir backend`
+   - `uvicorn app.main:app --reload`
 
 ### Frontend
 1. Install dependencies
@@ -42,7 +42,8 @@ Research RAG Studio is an AI research assistant that delivers grounded answers o
 ## Ingestion
 - POST `/ingest` for local paths or inline documents.
 - Seed the curated corpus:
-  - `python backend\scripts\seed_corpus.py`
+  - `cd backend`
+  - `uv run scripts\seed_corpus.py`
 
 ## Evaluation
 - Run batch RAGAS evaluation with a JSONL dataset:
@@ -53,15 +54,28 @@ Research RAG Studio is an AI research assistant that delivers grounded answers o
 ## Environment Variables
 Backend:
 - `GEMINI_API_KEY`
+- `APP_ENV`
 - `LLM_PROVIDER` (default: gemini)
 - `LLM_MODEL` (default: gemini-1.5-pro)
 - `EMBEDDING_PROVIDER` (default: gemini)
-- `EMBEDDING_MODEL` (default: models/text-embedding-004)
+- `EMBEDDING_MODEL` (default: gemini-embedding-001)
 - `EMBEDDING_DIM` (default: 768)
+- `EMBEDDING_BATCH_SIZE`
 - `PINECONE_API_KEY`
 - `PINECONE_INDEX`
 - `PINECONE_CLOUD`
 - `PINECONE_REGION`
+- `PUBLIC_INGEST_ENABLED`
+- `REQUIRE_HCAPTCHA`
+- `HCAPTCHA_SECRET_KEY`
+- `HCAPTCHA_SITE_KEY`
+- `QUERY_MAX_CHARS`
+- `QUERY_TOP_K_MAX`
+- `RATE_LIMIT_WINDOW_SECONDS`
+- `RATE_LIMIT_REQUESTS_PER_WINDOW`
+- `DAILY_REQUEST_LIMIT`
+- `CACHE_TTL_SECONDS`
+- `SESSION_SIGNING_SECRET`
 - `HYBRID_SEARCH_ENABLED`
 - `HYBRID_ALPHA`
 - `BM25_K`
@@ -69,3 +83,20 @@ Backend:
 
 Frontend:
 - `VITE_API_BASE_URL`
+- `VITE_HCAPTCHA_SITE_KEY`
+
+## Deployment
+Recommended free-tier stack:
+- Frontend: Vercel Hobby
+- Backend: Render free web service
+- Bot protection: hCaptcha
+- Dense retrieval: Pinecone Starter
+- LLM and embeddings: Gemini API free tier
+
+Production checklist:
+1. Deploy the backend with `APP_ENV=production`.
+2. Set `PUBLIC_INGEST_ENABLED=false`.
+3. Set `REQUIRE_HCAPTCHA=true`.
+4. Configure `HCAPTCHA_SECRET_KEY` on the backend and `VITE_HCAPTCHA_SITE_KEY` on the frontend.
+5. Set `CORS_ORIGINS` to the deployed frontend domain.
+6. Rotate any Gemini or Pinecone keys that were exposed during local development.
