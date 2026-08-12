@@ -36,7 +36,7 @@ def intake(
     events.stage_start("intake")
     deps = get_deps(config)
 
-    ledger = budget.new_ledger()
+    ledger = budget.new_ledger(state["mode"])
     prompt = registry.get("intake")
     result = deps.llm.generate_json(
         prompt.render(question=state["question"], history=_format_history(state)),

@@ -2,9 +2,11 @@
 
 Thin impure layer that wires the dense (Pinecone) retriever and the BM25 index
 (built once at startup from the committed ``data/index/chunks.jsonl``) into the
-pure fusion logic in ``app.retrieval``.
+pure fusion logic in ``app.retrieval``. When Pinecone is unconfigured or fails,
+the dense leg contributes nothing and retrieval is BM25-only.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,7 +15,9 @@ from app.models import SourceChunk
 from app.retrieval.fusion import fuse, normalize_scores
 from app.retrieval.index import get_bm25_index
 from app.services.embeddings import embedding_service
-from app.services.pinecone_client import pinecone_index
+from app.services.pinecone_client import get_pinecone_index
+
+logger = logging.getLogger("loupe.retrieval")
 
 
 @dataclass(frozen=True)
@@ -30,8 +34,15 @@ class RetrievalResult:
 
 
 def _retrieve_vector_chunks(query: str, top_k: int) -> list[SourceChunk]:
+    index = get_pinecone_index()
+    if index is None:
+        return []
     embedding = embedding_service.embed_query(query)
-    result: Any = pinecone_index.query(vector=embedding, top_k=top_k, include_metadata=True)
+    try:
+        result: Any = index.query(vector=embedding, top_k=top_k, include_metadata=True)
+    except Exception:  # noqa: BLE001 — degrade to BM25-only rather than fail the run
+        logger.warning("Pinecone query failed — falling back to BM25-only", exc_info=True)
+        return []
     matches = getattr(result, "matches", None)
     if matches is None and isinstance(result, dict):
         matches = result.get("matches", [])

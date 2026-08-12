@@ -8,27 +8,73 @@ The graph emits SSE-shaped custom events; :func:`app.sse.to_sse` serializes them
 
 import uuid
 from collections.abc import AsyncIterator, Mapping
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Path, Request
 from langgraph.types import Command
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 
 from app import observability
+from app.agent.errors import BudgetExceeded
 from app.agent.runtime import get_deps, get_graph
 from app.cache import CachedResponse, make_key, response_cache
-from app.models import ResearchRequest
+from app.core.config import settings
+from app.models import THREAD_ID_PATTERN, ResearchRequest
 from app.retrieval.index import corpus_version
 from app.security.access import public_access
 from app.sse import to_sse
 
 router = APIRouter(prefix="/research", tags=["research"])
 
+ThreadId = Annotated[str, Path(pattern=THREAD_ID_PATTERN)]
+
 
 class ApproveRequest(BaseModel):
     approved: bool
+
+
+# Execution ownership (single-process): one live run per thread_id, and a global
+# cap on simultaneous runs. Mutated only synchronously on the event loop (no await
+# between check and update), so plain containers are race-free here.
+_active_threads: set[str] = set()
+_active_runs = 0
+
+
+def _acquire_run(thread_id: str) -> None:
+    """Reserve a run slot or raise 409 (thread busy) / 503 (server at capacity)."""
+    global _active_runs
+    if thread_id in _active_threads:
+        raise HTTPException(status_code=409, detail="A run is already in progress for this thread.")
+    if _active_runs >= settings.max_concurrent_runs:
+        raise HTTPException(
+            status_code=503, detail="The server is at capacity; please retry shortly."
+        )
+    _active_threads.add(thread_id)
+    _active_runs += 1
+
+
+def _release_run(thread_id: str) -> None:
+    global _active_runs
+    _active_threads.discard(thread_id)
+    _active_runs = max(0, _active_runs - 1)
+
+
+def _guarded(
+    thread_id: str, inner: AsyncIterator[Mapping[str, Any]]
+) -> AsyncIterator[Mapping[str, Any]]:
+    """Release the run slot when the stream ends — normally, on error, or when
+    the client disconnects (generator close)."""
+
+    async def gen() -> AsyncIterator[Mapping[str, Any]]:
+        try:
+            async for chunk in inner:
+                yield chunk
+        finally:
+            _release_run(thread_id)
+
+    return gen()
 
 
 def _pending_interrupt(graph, config: dict[str, Any]) -> dict[str, Any] | None:
@@ -81,6 +127,7 @@ def _live(
         trace = observability.start_trace(**trace_meta)
         usage: dict[str, Any] = {}
         done: dict[str, Any] | None = None
+        failure: str | None = None
         try:
             # The graph is compiled with the sync SqliteSaver (its async methods raise),
             # so drive the sync stream and bridge each chunk to async via the threadpool
@@ -108,8 +155,14 @@ def _live(
                         usage=usage,
                     ),
                 )
+        except BudgetExceeded:
+            failure = "budget_exceeded"
+            raise  # to_sse turns this into the typed terminal error event
+        except Exception:
+            failure = "error"
+            raise
         finally:
-            outcome = done.get("outcome") if done else "interrupted"
+            outcome = failure or (done.get("outcome") if done else "interrupted")
             observability.end_trace(trace, outcome=outcome, usage=usage or None)
             await run_in_threadpool(observability.flush)
 
@@ -146,13 +199,14 @@ async def research(payload: ResearchRequest, request: Request) -> EventSourceRes
     state = {"question": payload.question, "mode": payload.mode}
     # Fresh threads may cache; follow-ups (thread_id supplied) depend on state.
     key = cache_key if payload.thread_id is None else None
-    chunks = _live(graph, state, config, key, trace_meta)
+    _acquire_run(thread_id)
+    chunks = _guarded(thread_id, _live(graph, state, config, key, trace_meta))
     return EventSourceResponse(to_sse(accepted, chunks), ping=10, headers=_SSE_HEADERS)
 
 
 @router.post("/{thread_id}/approve")
 async def approve_research(
-    thread_id: str, payload: ApproveRequest, request: Request
+    thread_id: ThreadId, payload: ApproveRequest, request: Request
 ) -> EventSourceResponse:
     """Resume a Deep-mode run paused at the HITL approval interrupt (§6).
 
@@ -177,7 +231,8 @@ async def approve_research(
     }
 
     resume = Command(resume={"approved": payload.approved})
-    chunks = _live(graph, resume, config, None, trace_meta)
+    _acquire_run(thread_id)
+    chunks = _guarded(thread_id, _live(graph, resume, config, None, trace_meta))
     return EventSourceResponse(to_sse(accepted, chunks), ping=10, headers=_SSE_HEADERS)
 
 

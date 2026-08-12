@@ -12,7 +12,7 @@ from typing import Protocol, TypeVar
 
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app import observability
 from app.agent import budget
@@ -107,6 +107,7 @@ class GeminiLLM:
         temperature: float = 0.0,
         prompt_id: str = "",
     ) -> str:
+        budget.check(ledger)  # hard pre-call gate: never start a billable call over budget
         started = time.monotonic()
         response = self._client.models.generate_content(
             model=_model_for(role),
@@ -135,6 +136,7 @@ class GeminiLLM:
         temperature: float = 0.3,
         prompt_id: str = "",
     ) -> Iterator[str]:
+        budget.check(ledger)  # hard pre-call gate: never start a billable call over budget
         started = time.monotonic()
         stream = self._client.models.generate_content_stream(
             model=_model_for(role),
@@ -172,6 +174,7 @@ class GeminiLLM:
         prompt_id: str = "",
     ) -> T:
         def _call(extra: str) -> T:
+            budget.check(ledger)  # pre-call gate covers the retry attempt too
             started = time.monotonic()
             response = self._client.models.generate_content(
                 model=_model_for(role),
@@ -199,9 +202,11 @@ class GeminiLLM:
 
         try:
             return _call("")
-        except Exception:
-            # One retry with an explicit instruction before giving up.
+        except ValidationError:
+            # Malformed model output only: one retry with an explicit instruction.
+            # Provider/network/budget errors propagate — retrying those would
+            # issue another billable request for the same failure.
             try:
                 return _call("\n\nReturn ONLY valid JSON matching the schema.")
-            except Exception as exc:  # noqa: BLE001 — surfaced as a control-data error
+            except ValidationError as exc:
                 raise NodeOutputError(f"{prompt_id or 'llm'}: invalid JSON output") from exc

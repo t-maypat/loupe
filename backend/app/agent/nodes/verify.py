@@ -3,7 +3,8 @@
 The differentiator (REVAMP_PLAN §3.4). The draft is segmented into atomic claims
 (:mod:`app.agent.segment`); one batched structured-output call returns a verdict
 per claim. Claim ids are validated against the request (mismatch → refusal, never
-a silent wrong verdict). Uncited factual claims are capped at ``PARTIAL``.
+a silent wrong verdict). Uncited factual claims are capped at ``PARTIAL``; claims
+whose citations all point at nonexistent sources are ``UNSUPPORTED``.
 """
 
 import time
@@ -15,7 +16,7 @@ from app.agent.errors import NodeOutputError
 from app.agent.render import render_evidence
 from app.agent.schemas import VerifyResult
 from app.agent.segment import cited_source_ids, segment_claims
-from app.agent.state import ClaimAudit, EvidenceChunk, ResearchState
+from app.agent.state import ClaimAudit, ResearchState
 from app.prompts import registry
 
 
@@ -28,30 +29,27 @@ def _render_claims(claim_texts: list[str], valid_ids: set[str]) -> str:
     return "\n".join(lines)
 
 
-def _audit(
-    claim_texts: list[str], result: VerifyResult, valid_ids: set[str], sources: list[EvidenceChunk]
-) -> list[ClaimAudit]:
+def _audit(claim_texts: list[str], result: VerifyResult, valid_ids: set[str]) -> list[ClaimAudit]:
     expected = [f"c{i}" for i in range(1, len(claim_texts) + 1)]
     by_id = {row.id: row for row in result.claims}
     if set(by_id) != set(expected) or len(result.claims) != len(expected):
         raise NodeOutputError("verify: judge verdicts do not match the audited claims")
 
-    all_ids = [chunk.source_id for chunk in sources]
     claims: list[ClaimAudit] = []
     for cid, text in zip(expected, claim_texts, strict=True):
-        cited = [sid for sid in cited_source_ids(text) if sid in valid_ids]
+        raw_cited = cited_source_ids(text)
+        cited = [sid for sid in raw_cited if sid in valid_ids]
         verdict = by_id[cid].verdict
-        # An uncited factual claim can never be SUPPORTED (§3.4).
-        if not cited and verdict == "SUPPORTED":
+        if raw_cited and not cited:
+            # Every citation points at a nonexistent source → fabricated citation.
+            verdict = "UNSUPPORTED"
+        elif not cited and verdict == "SUPPORTED":
+            # An uncited factual claim can never be SUPPORTED (§3.4).
             verdict = "PARTIAL"
+        # evidence_ids holds only the sources this claim actually cites; an
+        # uncited claim gets none, so the audit never implies false support.
         claims.append(
-            ClaimAudit(
-                id=cid,
-                text=text,
-                verdict=verdict,
-                evidence_ids=cited or all_ids,
-                note=by_id[cid].note,
-            )
+            ClaimAudit(id=cid, text=text, verdict=verdict, evidence_ids=cited, note=by_id[cid].note)
         )
     return claims
 
@@ -88,7 +86,7 @@ def verify(state: ResearchState, config: NodeConfig) -> dict[str, Any]:
             temperature=prompt.temperature,
             prompt_id=prompt.tag,
         )
-        claims = _audit(claim_texts, result, valid_ids, sources)
+        claims = _audit(claim_texts, result, valid_ids)
     except NodeOutputError:
         # Can't audit reliably → refuse rather than present unchecked claims (§4.3).
         events.stage_end(

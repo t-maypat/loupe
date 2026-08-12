@@ -37,7 +37,7 @@ def test_uncited_fabricated_sentence_is_unsupported():
     result = _run(FakeLLM(), draft)
     assert len(result["claims"]) == 1
     assert result["claims"][0].verdict == "UNSUPPORTED"
-    assert result["claims"][0].evidence_ids == ["S1", "S2"]  # judged against all sources
+    assert result["claims"][0].evidence_ids == []  # uncited → no evidence attributed
 
 
 def test_uncited_claim_is_capped_at_partial():
@@ -45,6 +45,17 @@ def test_uncited_claim_is_capped_at_partial():
     draft = "Sparse retrievers generally outperform dense retrievers on lexical overlap tasks."
     result = _run(FakeLLM(verify_verdict=lambda line: "SUPPORTED"), draft)
     assert result["claims"][0].verdict == "PARTIAL"
+    assert result["claims"][0].evidence_ids == []
+
+
+def test_invalid_citation_is_unsupported():
+    # A claim citing only nonexistent sources is a fabricated citation — always
+    # UNSUPPORTED, never silently associated with the real sources.
+    draft = "Dense retrievers were first deployed on submarines in 1962 [S9]."
+    result = _run(FakeLLM(verify_verdict=lambda line: "SUPPORTED"), draft)
+    claim = result["claims"][0]
+    assert claim.verdict == "UNSUPPORTED"
+    assert claim.evidence_ids == []
 
 
 def test_cited_claim_is_supported_against_its_sources():

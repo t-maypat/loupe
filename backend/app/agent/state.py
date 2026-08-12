@@ -49,6 +49,7 @@ class BudgetLedger(BaseModel):
     output_tokens: int = 0
     web_fetches: int = 0
     started_at: float = 0.0  # time.monotonic()
+    mode: Literal["quick", "deep"] = "deep"  # picks the wall-clock limit
 
 
 class QATurn(BaseModel):

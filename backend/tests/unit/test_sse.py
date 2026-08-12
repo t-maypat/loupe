@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from app import sse
+from app.agent.errors import BudgetExceeded, NodeOutputError
 
 
 async def _collect(agen: AsyncIterator[dict[str, str]]) -> list[dict[str, str]]:
@@ -49,6 +50,23 @@ async def test_to_sse_emits_terminal_error_on_exception():
     out = await _collect(sse.to_sse({}, _boom([{"event": "token", "data": {"text": "x"}}])))
     assert out[-1]["event"] == "error"
     assert json.loads(out[-1]["data"])["code"] == "internal"
+
+
+async def _fail_with(exc: Exception) -> AsyncIterator[dict[str, Any]]:
+    yield {"event": "token", "data": {"text": "x"}}
+    raise exc
+
+
+async def test_budget_exceeded_becomes_typed_terminal_error():
+    out = await _collect(sse.to_sse({}, _fail_with(BudgetExceeded("llm_calls"))))
+    assert out[-1]["event"] == "error"
+    assert json.loads(out[-1]["data"])["code"] == "budget_exceeded"
+
+
+async def test_node_output_error_becomes_typed_terminal_error():
+    out = await _collect(sse.to_sse({}, _fail_with(NodeOutputError("grade: invalid JSON"))))
+    assert out[-1]["event"] == "error"
+    assert json.loads(out[-1]["data"])["code"] == "invalid_model_output"
 
 
 def test_error_message_coerces_unknown_code():

@@ -4,6 +4,7 @@ Handles every terminal path â€” answered, refused, redirected, budget_exceeded â
 and appends the turn to ``history`` (the only field that survives across turns).
 """
 
+import time
 from typing import Any
 
 from app.agent import budget, events
@@ -64,6 +65,8 @@ def _decide(state: ResearchState) -> tuple[str, str | None]:
 
 
 def finalize(state: ResearchState, config: NodeConfig) -> dict[str, Any]:
+    started = time.monotonic()
+    events.stage_start("finalize")
     outcome, answer_md = _decide(state)
     ledger = state["ledger"]
     sources = state.get("sources") or []
@@ -77,6 +80,8 @@ def finalize(state: ResearchState, config: NodeConfig) -> dict[str, Any]:
         est_cost_usd=budget.est_cost_usd(ledger, settings.model_synth, settings.model_control),
         wall_ms=budget.wall_ms(ledger),
     )
+    events.stage_end("finalize", outcome, int((time.monotonic() - started) * 1000))
+    # done stays the last event of the run (terminal for the client).
     events.emit(
         events.DONE,
         outcome=outcome,

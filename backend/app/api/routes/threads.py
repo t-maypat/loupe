@@ -1,16 +1,19 @@
 """GET /api/threads/{thread_id} — last-state summary for page-refresh recovery (§6)."""
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path
 
 from app.agent.runtime import get_graph
+from app.models import THREAD_ID_PATTERN
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 
 @router.get("/{thread_id}")
-async def thread_summary(thread_id: str) -> dict[str, Any]:
+async def thread_summary(
+    thread_id: Annotated[str, Path(pattern=THREAD_ID_PATTERN)],
+) -> dict[str, Any]:
     graph = get_graph()
     snapshot = graph.get_state({"configurable": {"thread_id": thread_id}})
     values = snapshot.values if snapshot else None

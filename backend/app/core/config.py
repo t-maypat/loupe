@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     require_deep_approval: bool = False  # HITL gate for deep web research; prod sets 1
     threads_db_path: str = "data/threads.db"
     question_max_chars: int = 500
+    # Cap on simultaneously running research streams (each one drives LLM calls);
+    # requests beyond it get a 503 rather than piling onto the paid providers.
+    max_concurrent_runs: int = 4
 
     # Retrieval
     hybrid_alpha: float = 0.6

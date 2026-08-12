@@ -93,7 +93,12 @@ export type DoneEvent = {
   cached: boolean;
 };
 
-export type ErrorCode = "rate_limited" | "captcha_failed" | "budget_exceeded" | "internal";
+export type ErrorCode =
+  | "rate_limited"
+  | "captcha_failed"
+  | "budget_exceeded"
+  | "invalid_model_output"
+  | "internal";
 
 export type ErrorEvent = { code: ErrorCode; message: string };
 

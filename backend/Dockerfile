@@ -44,4 +44,6 @@ ENV PATH="/repo/backend/.venv/bin:$PATH" \
 WORKDIR /repo/backend
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so $PORT is honored when a platform injects it (Heroku assigns a
+# dynamic port); falls back to 8000 for docker-compose / plain `docker run`.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

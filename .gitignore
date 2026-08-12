@@ -18,10 +18,11 @@ coverage/
 .idea/
 .vscode/
 *.log
-context.md
-interview_prep.md
-
-REVAMP_PLAN.md
+# Documentation is kept local, not published with the repo.
+# Root-level markdown (README is the one exception) and everything under docs/.
+/*.md
+!/README.md
+docs/**/*.md
 
 # Generation eval reports (regenerated nightly)
 eval_reports/

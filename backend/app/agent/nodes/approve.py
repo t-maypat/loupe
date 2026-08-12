@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from langgraph.types import Command, interrupt
 
+from app.agent import events
 from app.agent.deps import NodeConfig
 from app.agent.state import ResearchState
 from app.core.config import settings
@@ -30,12 +31,21 @@ def _approved(decision: Any) -> bool:
 
 def approve(state: ResearchState, config: NodeConfig) -> Command[Literal["retrieve", "finalize"]]:
     if not settings.require_deep_approval:
+        events.stage_start("approve")
+        events.stage_end("approve", "auto-approved → retrieve", 0)
         return Command(goto="retrieve")
 
+    # interrupt() raises on the first execution (pausing the run before the stage
+    # events fire) and returns the resume value when the node re-executes, so the
+    # start/end pair below is emitted exactly once — on the resumed run. Elapsed
+    # is 0 by design: the wait is human decision time, not compute.
     decision = interrupt({"reason": APPROVE_REASON, "message": APPROVE_MESSAGE})
+    events.stage_start("approve")
     if _approved(decision):
+        events.stage_end("approve", "approved → retrieve", 0)
         return Command(goto="retrieve")
     # User declined live web research → graceful refusal carrying an explanation
     # (finalize surfaces ``redirect_message`` for a preset refusal, §6).
+    events.stage_end("approve", "declined → refusal", 0)
     update: dict[str, Any] = {"outcome": "refused", "redirect_message": DECLINE_MESSAGE}
     return Command(goto="finalize", update=update)

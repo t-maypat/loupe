@@ -1,12 +1,15 @@
 """Budget governor: per-request limits, cost pricing, and ledger accounting.
 
-``check()`` is called by the grade router (the natural gate of the retrieve →
-rewrite loop) and raises :class:`BudgetExceeded`, which routes the graph to
-``finalize`` with ``outcome="budget_exceeded"``. Token counts are recorded by the
-``LLMClient`` adapter via :func:`record_llm`.
+``check()`` is enforced in two places: the ``LLMClient`` adapter calls it before
+*every* outbound provider request (the hard pre-call gate — no billable call can
+start once a limit is hit), and the grade router calls it after grading (the
+graceful gate that routes the graph to ``finalize`` with
+``outcome="budget_exceeded"``). Token counts are recorded by the ``LLMClient``
+adapter via :func:`record_llm`.
 """
 
 import time
+from typing import Literal
 
 from app.agent.errors import BudgetExceeded
 from app.agent.state import BudgetLedger
@@ -32,8 +35,8 @@ _PRICES: dict[str, tuple[float, float]] = {
 _DEFAULT_PRICE = (0.30, 2.50)
 
 
-def new_ledger() -> BudgetLedger:
-    return BudgetLedger(started_at=time.monotonic())
+def new_ledger(mode: Literal["quick", "deep"] = "deep") -> BudgetLedger:
+    return BudgetLedger(started_at=time.monotonic(), mode=mode)
 
 
 def record_llm(ledger: BudgetLedger, input_tokens: int, output_tokens: int) -> None:
@@ -56,8 +59,12 @@ def wall_ms(ledger: BudgetLedger) -> int:
     return int((time.monotonic() - ledger.started_at) * 1000)
 
 
-def check(ledger: BudgetLedger, mode: str) -> None:
-    """Raise :class:`BudgetExceeded` if any hard limit is exceeded."""
+def check(ledger: BudgetLedger, mode: str | None = None) -> None:
+    """Raise :class:`BudgetExceeded` if any hard limit is exceeded.
+
+    ``mode`` defaults to the ledger's own mode so call sites without graph state
+    (the LLM adapter) can still apply the right wall-clock limit."""
+    mode = mode or ledger.mode
     if ledger.llm_calls >= MAX_LLM_CALLS:
         raise BudgetExceeded(f"llm_calls={ledger.llm_calls} >= {MAX_LLM_CALLS}")
     if ledger.input_tokens + ledger.output_tokens >= MAX_TOTAL_TOKENS:

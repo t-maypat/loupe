@@ -42,6 +42,15 @@ def test_check_raises_on_wall_clock():
         budget.check(ledger, "quick")
 
 
+def test_check_uses_ledger_mode_when_mode_omitted():
+    # The LLM adapter calls check(ledger) without graph state; the ledger's own
+    # mode must pick the right wall-clock limit.
+    ledger = budget.new_ledger("quick")
+    ledger.started_at = time.monotonic() - budget.MAX_WALL_SECONDS_QUICK - 1
+    with pytest.raises(BudgetExceeded):
+        budget.check(ledger)
+
+
 def test_est_cost_is_positive_and_rounded():
     ledger = budget.new_ledger()
     budget.record_llm(ledger, 1_000_000, 1_000_000)
