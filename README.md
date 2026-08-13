@@ -83,18 +83,18 @@ evidence it cited, and refuses to answer when the evidence does not hold up.
 
 ```mermaid
 flowchart TD
-    Q[POST /api/research] --> IN[intake: classify + route]
-    IN -->|smalltalk / out-of-domain| FIN
-    IN -->|quick| RET
-    IN -->|deep| PLAN[plan: sub-questions ≤3]
-    PLAN --> HITL{approve web?}
-    HITL -->|approved| RET[retrieve: hybrid corpus tool + web tool]
-    RET --> GRADE[grade: evidence sufficiency]
-    GRADE -->|insufficient & budget left| REW[rewrite: refine queries]
+    Q["POST /api/research"] --> IN["intake: classify and route"]
+    IN -->|"smalltalk or out-of-domain"| FIN
+    IN -->|"quick"| RET
+    IN -->|"deep"| PLAN["plan: up to 3 sub-questions"]
+    PLAN --> HITL{"approve web?"}
+    HITL -->|"approved"| RET["retrieve: hybrid corpus tool plus web tool"]
+    RET --> GRADE["grade: evidence sufficiency"]
+    GRADE -->|"insufficient, budget left"| REW["rewrite: refine queries"]
     REW --> RET
-    GRADE -->|sufficient or budget exhausted| SYN[synthesize: streamed cited answer]
-    SYN --> VER[verify: claim audit vs cited evidence]
-    VER --> FIN[finalize: answer | refusal + ledger]
+    GRADE -->|"sufficient or budget exhausted"| SYN["synthesize: streamed cited answer"]
+    SYN --> VER["verify: claim audit vs cited evidence"]
+    VER --> FIN["finalize: answer or refusal, plus ledger"]
 ```
 
 A LangGraph `StateGraph` drives the loop, and the nodes are plain Python functions. The graph
