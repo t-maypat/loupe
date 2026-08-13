@@ -82,7 +82,7 @@ export function QueryBar({
       {captchaEnabled && (
         <div className="captcha-row">
           <span className="captcha-note">Public demo · verify to send</span>
-          <div ref={captchaRef} />
+          <div className="captcha-widget" ref={captchaRef} />
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 // Live agent timeline: one row per node execution, iterations grouped as loops (§11).
 
+import { PixelLoader } from "./PixelLoader";
 import type { StageEvent } from "../lib/types";
 
 type Props = {
@@ -52,7 +53,7 @@ function foldRows(stages: StageEvent[]): Row[] {
       rows[at].done = true;
       openRow.delete(key);
     } else {
-      // `end` without a tracked `start` (e.g. after recovery) — show standalone.
+      // `end` without a tracked `start` (e.g. after recovery) - show standalone.
       rows.push({
         node: s.node,
         iteration: s.iteration,
@@ -73,7 +74,7 @@ export function AgentTimeline({ stages, active }: Props) {
   }
 
   return (
-    <ol className="timeline">
+    <ol className={`timeline ${active ? "timeline-active" : ""}`}>
       {rows.map((row, i) => {
         const running = active && !row.done && i === rows.length - 1;
         return (
@@ -90,7 +91,11 @@ export function AgentTimeline({ stages, active }: Props) {
                 )}
               </div>
               {row.summary && <p className="timeline-summary">{row.summary}</p>}
-              {running && <p className="timeline-summary timeline-running">working…</p>}
+              {running && (
+                <div className="timeline-loading">
+                  <PixelLoader label="Working" />
+                </div>
+              )}
             </div>
           </li>
         );

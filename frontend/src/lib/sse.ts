@@ -2,7 +2,7 @@
 //
 // We use fetch + ReadableStream (not native EventSource) because /api/research is
 // a POST with a JSON body. sse-starlette emits `event:`/`data:` blocks separated
-// by a blank line, plus `:`-prefixed comment lines for keep-alive pings — those
+// by a blank line, plus `:`-prefixed comment lines for keep-alive pings - those
 // are ignored here.
 
 export type RawEvent = { event: string; data: string };

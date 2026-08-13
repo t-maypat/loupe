@@ -25,7 +25,7 @@ export function useResearch() {
     try {
       if (state.threadId) sessionStorage.setItem(THREAD_STORAGE_KEY, state.threadId);
     } catch {
-      // sessionStorage unavailable (e.g. privacy mode) — recovery just won't persist.
+      // sessionStorage unavailable (e.g. privacy mode) - recovery just won't persist.
     }
   }, [state.threadId]);
 
@@ -64,7 +64,7 @@ export function useResearch() {
         });
       })
       .catch(() => {
-        // Stale/expired thread (ephemeral disk) — start fresh.
+        // Stale/expired thread (ephemeral disk) - start fresh.
       });
     return () => {
       cancelled = true;
