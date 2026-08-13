@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrandGlyph } from "../components/BrandGlyph";
 import { PixelDither } from "../components/PixelDither";
 import { GITHUB_URL } from "../lib/config";
+import { useReveal, useSmoothAnchors } from "../lib/scroll";
 
 const PIPELINE = [
   { node: "intake", blurb: "Read the question and turn away what the corpus cannot answer." },
@@ -55,6 +56,19 @@ const CAPABILITIES = [
 ];
 
 export function Landing() {
+  useSmoothAnchors();
+
+  const answerHead = useReveal<HTMLDivElement>();
+  const proof = useReveal<HTMLDivElement>();
+  const facts = useReveal<HTMLDivElement>();
+  const howText = useReveal<HTMLDivElement>();
+  const pipeline = useReveal<HTMLDivElement>();
+  const checksHead = useReveal<HTMLDivElement>();
+  const cards = useReveal<HTMLDivElement>();
+  const refusalMock = useReveal<HTMLDivElement>();
+  const refusalText = useReveal<HTMLDivElement>();
+  const closing = useReveal<HTMLDivElement>();
+
   return (
     <div className="lp">
       <header className="lp-nav">
@@ -106,7 +120,7 @@ export function Landing() {
         {/* ---------- The answer ---------- */}
         <section className="lp-section" id="answer">
           <div className="lp-container">
-            <div className="lp-section-head">
+            <div className="lp-section-head" data-reveal ref={answerHead}>
               <p className="lp-eyebrow lp-eyebrow-dot">What comes back</p>
               <h2 className="lp-h2">Every sentence carries its source.</h2>
               <p className="lp-body">
@@ -115,13 +129,15 @@ export function Landing() {
                 margin, next to the line it belongs to.
               </p>
             </div>
-            <ProofSheet />
+            <div data-reveal ref={proof}>
+              <ProofSheet />
+            </div>
           </div>
         </section>
 
         {/* ---------- Facts strip ---------- */}
         <section className="lp-facts">
-          <div className="lp-container lp-facts-inner">
+          <div className="lp-container lp-facts-inner" data-reveal-stagger ref={facts}>
             <Fact value="Dense + BM25" label="two searches, merged" />
             <Fact value="Every claim" label="graded after writing" />
             <Fact value="10 calls, 80k tokens" label="hard limit per run" />
@@ -132,7 +148,7 @@ export function Landing() {
         {/* ---------- How it runs ---------- */}
         <section className="lp-section" id="how">
           <div className="lp-container lp-split">
-            <div className="lp-split-text">
+            <div className="lp-split-text" data-reveal ref={howText}>
               <p className="lp-eyebrow lp-eyebrow-dot">How it runs</p>
               <h2 className="lp-h2">Eight steps, and you watch all of them.</h2>
               <p className="lp-body">
@@ -150,18 +166,20 @@ export function Landing() {
               </a>
             </div>
 
-            <Pipeline />
+            <div data-reveal ref={pipeline}>
+              <Pipeline />
+            </div>
           </div>
         </section>
 
         {/* ---------- Capabilities ---------- */}
         <section className="lp-section" id="checks">
           <div className="lp-container">
-            <div className="lp-section-head">
+            <div className="lp-section-head" data-reveal ref={checksHead}>
               <p className="lp-eyebrow lp-eyebrow-dot">What it checks</p>
               <h2 className="lp-h2">Six things happen on every question.</h2>
             </div>
-            <div className="lp-grid">
+            <div className="lp-grid" data-reveal-stagger ref={cards}>
               {CAPABILITIES.map((c) => (
                 <article className="lp-card" key={c.title}>
                   <span className="lp-card-icon" aria-hidden>
@@ -178,7 +196,7 @@ export function Landing() {
         {/* ---------- Refusal ---------- */}
         <section className="lp-section" id="refusal">
           <div className="lp-container lp-split lp-split-reverse">
-            <div className="lp-refusal-mock">
+            <div className="lp-refusal-mock" data-reveal ref={refusalMock}>
               <span className="refusal-badge">Refused</span>
               <h3>I can't answer this reliably</h3>
               <p>
@@ -192,7 +210,7 @@ export function Landing() {
               </div>
             </div>
 
-            <div className="lp-split-text">
+            <div className="lp-split-text" data-reveal ref={refusalText}>
               <p className="lp-eyebrow lp-eyebrow-dot">When it refuses</p>
               <h2 className="lp-h2">A wrong answer costs more than no answer.</h2>
               <p className="lp-body">
@@ -211,7 +229,7 @@ export function Landing() {
 
         {/* ---------- Closing ---------- */}
         <section className="lp-close">
-          <div className="lp-container lp-close-inner">
+          <div className="lp-container lp-close-inner" data-reveal ref={closing}>
             <h2 className="lp-h2">Ask it something you can check.</h2>
             <p className="lp-body">
               The corpus covers retrieval, RAG, embeddings, and agentic search. Bring a question
