@@ -1,10 +1,9 @@
 name: CI
 
-# TEMPORARILY DISABLED: manual-only. To re-enable automatic runs, restore:
-#   push:
-#     branches: [main]
-#   pull_request:
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch: {}
 
 defaults:
@@ -52,6 +51,10 @@ jobs:
 
   eval-retrieval:
     runs-on: ubuntu-latest
+    # Manual-only until corpus_embeddings.npz and query_embeddings.npz are committed
+    # (built once with scripts/build_eval_fixtures.py, which needs a real Gemini key).
+    # Without them the script exits 1 on every push.
+    if: github.event_name == 'workflow_dispatch'
     env:
       # Deterministic offline eval: local numpy store + BM25 + fusion, no network.
       # A key is only needed so app.core.config validates; nothing calls Gemini.
@@ -67,9 +70,6 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
-    # TEMPORARILY DISABLED: don't run the frontend job. Re-enable by removing this
-    # `if:` line (the whole workflow is already manual-only via workflow_dispatch).
-    if: false
     defaults:
       run:
         working-directory: frontend
